@@ -20,7 +20,8 @@ def rot2(th):
     """
 
     ## TODO - Fill this out
-    R = 
+    R = np.array([[np.cos(th), -np.sin(th)],
+                  [np.sin(th), np.cos(th)]])
     return R
 
 ## 3D Transformations
@@ -33,7 +34,9 @@ def rotx(th):
         R: 3 x 3 numpy array representing rotation about x-axis by amount theta
     """
     ## TODO - Fill this out
-    R = 
+    R = np.array([[1, 0, 0],
+                  [0, np.cos(th), -np.sin(th)],
+                  [0, np.sin(th), np.cos(th)]])
 
     return R
 
@@ -46,7 +49,9 @@ def roty(th):
         R: 3 x 3 numpy array representing rotation about y-axis by amount theta
     """
     ## TODO - Fill this out
-    R = 
+    R = np.array([[np.cos(th), 0, np.sin(th)],
+                  [0, 1, 0],
+                  [-np.sin(th), 0, np.cos(th)]])
 
     return R
 
@@ -60,7 +65,9 @@ def rotz(th):
     """
 
     ## TODO - Fill this out
-    R = 
+    R = np.array([[np.cos(th), -np.sin(th), 0],
+                  [np.sin(th), np.cos(th), 0],
+                  [0, 0, 1]])
 
     return R
 
@@ -74,4 +81,4 @@ def rot_inv(R):
         R: 2x2 or 3x3 inverse of the input rotation matrix
     '''
     ## TODO - Fill this out
-    return 
+    return np.transpose(R)

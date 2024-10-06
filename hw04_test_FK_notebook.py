@@ -6,7 +6,9 @@
 
 # %%
 import transforms as tr
+import transforms_symbolic as st
 import numpy as np
+import sympy as sm
 np.set_printoptions(precision=4)
 
 
@@ -59,5 +61,14 @@ print(R)
 R = tr.quat2R(np.array([0.707, 0.707, 0.0, 0.0]))
 print("R for quaternion2R was:")
 print(R)
+
+# %%
+
+R = tr.rotx(0.787) @ tr.rotz(0.787) @ tr.roty(0.787)
+print('test')
+print(R)
+# R = st.rotx(0.787) * st.rotz(0.787) * st.roty(0.787)
+# print('test symbolic')
+# print(R)
 
 # %%

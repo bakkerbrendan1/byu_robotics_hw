@@ -49,7 +49,32 @@ class dh2AFunc:
                 # Do this in terms of the variables "dh" and "q" (so that one of the entries in your dh list or array
                 # will need to be added to q).
 
-                return T
+                # OLD CODE
+                # theta = dh[0]
+                # d = dh[1]
+                # a = dh[2]
+                # alpha = dh[3]
+                #
+                # T = se3(rotz(theta + q), [0, 0, d]) @\
+                #     se3(rotx(alpha), [a, 0, 0])
+                #
+                # return T
+
+                theta = dh[0] + q
+                d = dh[1]
+                a = dh[2]
+                alpha = dh[3]
+
+                cth = np.cos(theta)
+                sth = np.sin(theta)
+                cal = np.cos(alpha)
+                sal = np.sin(alpha)
+
+                return np.array(
+                    [[cth, -sth * cal, sth *sal, a * cth],
+                     [sth, cth * cal, -cth * sal, a * sth],
+                     [0, sal, cal, d],
+                     [0, 0, 0, 1]])
 
 
         # if joint is prismatic implement correct equations here:
@@ -60,7 +85,31 @@ class dh2AFunc:
                 # Do this in terms of the variables "dh" and "q" (so that one of the entries in your dh list or array
                 # will need to be added to q).
 
-                return T
+                # OLD CODE
+                # theta = dh[0]
+                # d = dh[1]
+                # a = dh[2]
+                # alpha = dh[3]
+                # T = se3(rotz(theta), [0, 0, d + q]) @\
+                #     se3(rotx(alpha), [a, 0, 0])
+                #
+                # return T
+
+                theta = dh[0]
+                d = dh[1] + q
+                a = dh[2]
+                alpha = dh[3]
+
+                cth = np.cos(theta)
+                sth = np.sin(theta)
+                cal = np.cos(alpha)
+                sal = np.sin(alpha)
+
+                return np.array(
+                    [[cth, -sth * cal, sth * sal, a * cth],
+                     [sth, cth * cal, -cth * sal, a * sth],
+                     [0, sal, cal, d],
+                     [0, 0, 0, 1]])
 
 
         self.A = A
@@ -105,7 +154,9 @@ class SerialArm:
         for i in range(self.n):
             # TODO use the class definition above (dh2AFunc), and the dh parameters and joint type to
             # make a function and then append that function to the "transforms" list. 
-            f = 
+            
+            # changed to answer key, previously: dh2AFunc(self.dh[i], self.jt[i])
+            f = dh2AFunc(self.dh[i], self.jt[i])
             self.transforms.append(f.A)
 
 
@@ -182,9 +233,82 @@ class SerialArm:
         # statements and a "for" loop to add the effect of each subsequent A_i(q_i). But you can 
         # organize the code any way you like.  
         T = np.eye(4)
+        # if there is a base frame, redefine base
+        if base and start_frame == 0:
+            T = self.base
+        else:
+            T = eye
+
+        for i in range(start_frame, end_frame):
+            T = T @ self.transforms[i](q[i])
+
+        if tip and end_frame == self.n:
+            T = T @ self.tip
 
         return T
 
+
+    def jacob(self, q, index=None, base=False, tip=False):
+        """
+        J = arm.jacob(q)
+        Description: 
+        Returns the geometric jacobian for the frame defined by "index", which corresponds
+        to a frame on the arm, with the arm in a given configuration defined by "q"
+
+        Parameters:
+        q - list or numpy array of joint positions
+        index - integer, which joint frame at which to calculate the Jacobian
+
+        Returns:
+        J - numpy matrix 6xN, geometric jacobian of the robot arm
+        """
+
+
+        if index is None:
+            index = self.n
+        elif index > self.n:
+            print("WARNING: Index greater than number of joints!")
+            print(f"Index: {index}")
+
+        # TODO - start by declaring a zero matrix that is the correct size for the Jacobian
+        J = np.zeros( (6, index) )
+
+        # TODO - find the current position of the point of interest (usually origin of frame "n") 
+        # using your fk function this will likely require additional intermediate variables than 
+        # what is shown here. 
+        T_total = self.fk(q)
+        pe = T_total[0:3,3] # define z of the point of interest
+
+
+        # TODO - calculate all the necessary values using your "fk" function, and fill every column
+        # of the jacobian using this "for" loop. Functions like "np.cross" may also be useful. 
+        for i in range(index):
+            # check if joint is revolute
+            if self.jt[i] == 'r':
+                # pull z vector out of transformation matrix
+                T = self.fk(q, index=i)
+                z = T[0:3, 2]
+                p = T[0:3, 3]
+                # find the position vector
+                Jv = np.cross(z, pe - p)
+                # find the angular velocity
+                Jw = z
+
+                J[0:3, i] = Jv
+                J[3:6, i] = Jw
+
+            # if not assume joint is prismatic
+            else:
+                # prismatic joint doesn't have cross product for velocity
+                T = self.fk(q, index=i)
+                Jv = T[0:3, 2]
+                # prismatic joint doesn't have any linear velocity
+                Jw = np.zeros(3)
+
+                J[0:3, i] = Jv
+                J[3:6, i] = Jw
+
+        return J
 
     # You don't need to touch this function, but it is helpful to be able to "print" a description about
     # the robot that you make.
@@ -201,6 +325,7 @@ class SerialArm:
             dh_string += f"{self.dh[i][0]}\t|\t{self.dh[i][1]}\t|\t{self.dh[i][2]}\t|\t{self.dh[i][3]}\t|\t{self.jt[i]}\n"
         return "Serial Arm\n" + dh_string
 
+    
 
 if __name__ == "__main__":
     from visualization import VizScene

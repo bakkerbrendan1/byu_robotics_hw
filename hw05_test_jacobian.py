@@ -48,6 +48,10 @@ J2 = arm.jacob(q_set2)
 print("from first set of q's, J is:")
 print(J1)
 
+print("from second set of q's, J is:")
+print(J2)
+
+# %%
 print("now look at the configuration of the arm for q_set1 to understand J")
 
 # making a visualization

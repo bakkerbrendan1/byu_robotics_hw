@@ -11,15 +11,18 @@ modified by:
 Marc Killpack, Sept 21, 2022 and Sept 21, 2023
 """
 
-from transforms import *
+from transforms_symbolic import *
+import sympy as sm
+from IPython.display import display, Math
+from sympy.physics.vector.printing import vlatex
 
-eye = np.eye(4)
-pi = np.pi
+eye = sm.eye(4)
+pi = sm.pi
 
 
 # this is a convenience class that makes it easy to define a function that calculates "A_i(q)", given the
 # DH parameters for link and joint "i" only. 
-class dh2AFunc:
+class dh2AFunc_sym:
     """
     A = dh2AFunc(dh, joint_type="r")
     Description:
@@ -65,12 +68,12 @@ class dh2AFunc:
                 a = dh[2]
                 alpha = dh[3]
 
-                cth = np.cos(theta)
-                sth = np.sin(theta)
-                cal = np.cos(alpha)
-                sal = np.sin(alpha)
+                cth = sm.cos(theta)
+                sth = sm.sin(theta)
+                cal = sm.cos(alpha)
+                sal = sm.sin(alpha)
 
-                return np.array(
+                return sm.Matrix(
                     [[cth, -sth * cal, sth *sal, a * cth],
                      [sth, cth * cal, -cth * sal, a * sth],
                      [0, sal, cal, d],
@@ -100,12 +103,12 @@ class dh2AFunc:
                 a = dh[2]
                 alpha = dh[3]
 
-                cth = np.cos(theta)
-                sth = np.sin(theta)
-                cal = np.cos(alpha)
-                sal = np.sin(alpha)
+                cth = sm.cos(theta)
+                sth = sm.sin(theta)
+                cal = sm.cos(alpha)
+                sal = sm.sin(alpha)
 
-                return np.array(
+                return sm.array(
                     [[cth, -sth * cal, sth * sal, a * cth],
                      [sth, cth * cal, -cth * sal, a * sth],
                      [0, sal, cal, d],
@@ -156,7 +159,7 @@ class SerialArm:
             # make a function and then append that function to the "transforms" list. 
             
             # changed to answer key, previously: dh2AFunc(self.dh[i], self.jt[i])
-            f = dh2AFunc(self.dh[i], self.jt[i])
+            f = dh2AFunc_sym(self.dh[i], self.jt[i])
             self.transforms.append(f.A)
 
 
@@ -166,13 +169,13 @@ class SerialArm:
         self.qlim = joint_limits
 
         # define reach attribute of arm
-        self.reach = 0
-        for i in range(self.n):
-            self.reach += np.sqrt(self.dh[i][0]**2 + self.dh[i][2]**2)
+        # self.reach = 0
+        # for i in range(self.n):
+        #     self.reach += sm.sqrt(self.dh[i][0]**2 + self.dh[i][2]**2)
 
-        self.max_reach = 0.0
-        for dh in self.dh:
-            self.max_reach += norm(np.array([dh[0], dh[2]]))
+        # self.max_reach = 0.0
+        # for dh in self.dh:
+        #     self.max_reach += norm(sm.Matrix([dh[0], dh[2]]))
 
 
     def fk(self, q, index=None, base=False, tip=False):
@@ -241,7 +244,7 @@ class SerialArm:
         # unsure about the role of each of these variables. This is mostly easily done with some if/else 
         # statements and a "for" loop to add the effect of each subsequent A_i(q_i). But you can 
         # organize the code any way you like.  
-        T = np.eye(4)
+        T = sm.eye(4)
         # if there is a base frame, redefine base
         if base and start_frame == 0:
             T = self.base
@@ -280,17 +283,17 @@ class SerialArm:
             print(f"Index: {index}")
 
         # TODO - start by declaring a zero matrix that is the correct size for the Jacobian
-        J = np.zeros( (6, index) )
+        J = sm.zeros(6, index)
 
         # TODO - find the current position of the point of interest (usually origin of frame "n") 
         # using your fk function this will likely require additional intermediate variables than 
         # what is shown here. 
-        Tn_in_0 = self.fk(q)
-        pe = Tn_in_0[0:3,3] # define z of the point of interest
+        T_total = self.fk(q)
+        pe = T_total[0:3,3] # define z of the point of interest
 
 
         # TODO - calculate all the necessary values using your "fk" function, and fill every column
-        # of the jacobian using this "for" loop. Functions like "np.cross" may also be useful. 
+        # of the jacobian using this "for" loop. Functions like "sm.cross" may also be useful. 
         for i in range(index):
             # check if joint is revolute
             if self.jt[i] == 'r':
@@ -299,7 +302,7 @@ class SerialArm:
                 z = T[0:3, 2]
                 p = T[0:3, 3]
                 # find the position vector
-                Jv = np.cross(z, pe - p)
+                Jv = z.cross(pe - p)
                 # find the angular velocity
                 Jw = z
 
@@ -312,139 +315,12 @@ class SerialArm:
                 T = self.fk(q, index=i)
                 Jv = T[0:3, 2]
                 # prismatic joint doesn't have any linear velocity
-                Jw = np.zeros(3)
+                Jw = sm.zeros(3)
 
                 J[0:3, i] = Jv
                 J[3:6, i] = Jw
 
         return J
-
-    # insert this function into your SerialArm class and complete it. 
-    # Please keep the function definition, and what it returns the same. 
-    def ik_position(self, target, q0=None, method='J_T', force=True, tol=1e-4, K=None, kd=0.001, max_iter=100):
-        """
-        (qf, ef, iter, reached_max_iter, status_msg) = arm.ik2(target, q0=None, method='jt', force=False, tol=1e-6, K=None)
-        Description:
-            Returns a solution to the inverse kinematics problem finding
-            joint angles corresponding to the position (x y z coords) of target
-
-        Args:
-            target: 3x1 numpy array that defines the target location. 
-
-            q0: length of initial joint coordinates, defaults to q=0 (which is
-            often a singularity - other starting positions are recommended)
-
-            method: String describing which IK algorithm to use. Options include:
-                - 'pinv': damped pseudo-inverse solution, qdot = J_dag * e * dt, where
-                J_dag = J.T * (J * J.T + kd**2)^-1
-                - 'J_T': jacobian transpose method, qdot = J.T * K * e
-
-            force: Boolean, if True will attempt to solve even if a naive reach check
-            determines the target to be outside the reach of the arm
-
-            tol: float, tolerance in the norm of the error in pose used as termination criteria for while loop
-
-            K: 3x3 numpy matrix. For both pinv and J_T, K is the positive definite gain matrix used for both. 
-
-            kd: is a scalar used in the pinv method to make sure the matrix is invertible. 
-
-            max_iter: maximum attempts before giving up.
-
-        Returns:
-            qf: 6x1 numpy matrix of final joint values. If IK fails to converge the last set
-            of joint angles is still returned
-
-            ef: 3x1 numpy vector of the final error
-
-            count: int, number of iterations
-
-            flag: bool, "true" indicates successful IK solution and "false" unsuccessful
-
-            status_msg: A string that may be useful to understanding why it failed. 
-        """
-        # Fill in q if none given, and convert to numpy array 
-        if isinstance(q0, np.ndarray):
-            q = q0
-        elif q0 == None:
-            q = np.array([0.0]*self.n)
-        else:
-            q = np.array(q0)
-
-        # initializing some variables in case checks below don't work
-        error = None
-        count = 0
-
-        # Try basic check for if the target is in the workspace.
-        # Maximum length of the arm is sum(sqrt(d_i^2 + a_i^2)), distance to target is norm(A_t)
-        maximum_reach = 0
-        for i in range(self.n):  # Add max length of each link
-            maximum_reach = maximum_reach + np.sqrt(self.dh[i][1] ** 2 + self.dh[i][2] ** 2)
-
-        pt = target  # Find distance to target
-        target_distance = np.sqrt(pt[0] ** 2 + pt[1] ** 2 + pt[2] ** 2)
-
-        if target_distance > maximum_reach and not force:
-            print("WARNING: Target outside of reachable workspace!")
-            return q, error, count, False, "Failed: Out of workspace"
-        else:
-            if target_distance > maximum_reach:
-                print("Target out of workspace, but finding closest solution anyway")
-            else:
-                print("Target passes naive reach test, distance is {:.1} and max reach is {:.1}".format(
-                    float(target_distance), float(maximum_reach)))
-
-        if not isinstance(K, np.ndarray):
-            return q, error, count, False,  "No gain matrix 'K' provided"
-
-
-
-        # you may want to define some functions here to help with operations that you will 
-        # perform repeatedly in the while loop below. Alternatively, you can also just define 
-        # them as class functions and use them as self.<function_name>.
-
-        # for example:
-        def get_error(q):
-            cur_position = self.fk(q)[0:3, 3]
-            e = target - cur_position
-            return e
-
-        # define function based on selected method
-        if method=='J_T':
-            # define function
-            def q_dot(J):
-                J = self.jacob(q)[0:3, :]
-                e = get_error(q)
-                qdot = J.T @ K @ e
-                return qdot
-
-        elif method=='pinv': # damped pseudo inverse
-            def q_dot(q):
-                # get top 3 rows of jacobian
-                J = self.jacob(q)[0:3, :]
-                e = get_error(q)
-                J_dag = J.T @ np.linalg.inv(J @ J.T + (kd**2) * np.eye(3))
-                qdot = J_dag @ K @ e
-                return qdot
-
-
-        # In this while loop you will update q for each iteration, and update, then
-        # your error to see if the problem has converged. You may want to print the error
-        # or the "count" at each iteration to help you see the progress as you debug. 
-        # You may even want to plot an arm initially for each iteration to make sure 
-        # it's moving in the right direction towards the target. 
-        error = get_error(q)
-        while np.linalg.norm(error) > tol and count < max_iter:
-            q = q + q_dot(q)
-            error = get_error(q)
-            count += 1
-        # print(self.jacob(q)[0:3, :].T)
-
-        # when "while" loop is done, return the relevant info. 
-
-        return (q, error, count, count < max_iter, 'No errors noted')
-
-
-
 
     # You don't need to touch this function, but it is helpful to be able to "print" a description about
     # the robot that you make.
@@ -456,35 +332,9 @@ class SerialArm:
         """
         dh_string = """DH PARAMS\n"""
         dh_string += """theta\t|\td\t|\ta\t|\talpha\t|\ttype\n"""
-        dh_string += """------------------------------------------------------------------------\n"""
+        dh_string += """---------------------------------------\n"""
         for i in range(self.n):
-            # unrounded version:
-            # dh_string += f"{self.dh[i][0]}\t|\t{self.dh[i][1]}\t|\t{self.dh[i][2]}\t|\t{self.dh[i][3]}\t|\t{self.jt[i]}\n"
-            # dh_string += f"{float(self.dh[i][0]):.4f}\t|\t{float(self.dh[i][1]):.4f}\t|\t{float(self.dh[i][2]):.4f}\t|\t{float(self.dh[i][3]):.4f}\t|\t{self.jt[i]}\n"
-
-            # dh_string += f"{self.dh[i][0] if float(self.dh[i][0]) == 0 else f'{float(self.dh[i][0]):.4f}'}\t|\t"
-            # dh_string += f"{self.dh[i][1] if float(self.dh[i][1]) == 0 else f'{float(self.dh[i][1]):.4f}'}\t|\t"
-            # dh_string += f"{self.dh[i][2] if float(self.dh[i][2]) == 0 else f'{float(self.dh[i][2]):.4f}'}\t|\t"
-            # dh_string += f"{self.dh[i][3] if float(self.dh[i][3]) == 0 else f'{float(self.dh[i][3]):.4f}'}\t|\t{self.jt[i]}\n"
-
-
-            def format_number(value):
-                # Check if the value is numeric and cast it to float
-                try:
-                    num = float(value)
-                    # If it's an integer, return it as an integer without decimals
-                    if num.is_integer():
-                        return f"{int(num)}"
-                    else:
-                        # Return the number formatted to 4 decimal places if it has decimals
-                        return f"{num:.4f}"
-                except ValueError:
-                    # If it's not numeric, return the original string
-                    return value
-
-            # Then use the function in your print statement
-            dh_string += f"{format_number(self.dh[i][0])}\t|\t{format_number(self.dh[i][1])}\t|\t{format_number(self.dh[i][2])}\t|\t{format_number(self.dh[i][3])}\t|\t{self.jt[i]}\n"
-
+            dh_string += f"{self.dh[i][0]}\t|\t{self.dh[i][1]}\t|\t{self.dh[i][2]}\t|\t{self.dh[i][3]}\t|\t{self.jt[i]}\n"
         return "Serial Arm\n" + dh_string
 
     

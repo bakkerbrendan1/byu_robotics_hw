@@ -64,7 +64,7 @@ viz.add_arm(arm, draw_frames=True)
 viz.update(qs=[q_set1])
 
 
-time_to_run = 30
+time_to_run = 10 # was 30
 refresh_rate = 60
 
 for i in range(refresh_rate * time_to_run):
@@ -85,6 +85,6 @@ for i in range(refresh_rate * time_to_run):
 
 viz.close_viz()
 
-   
+
 
 # %%

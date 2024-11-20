@@ -8,63 +8,43 @@ John Morrell, Jan 26 2022
 Tarnarmour@gmail.com
 
 modified by: 
-Marc Killpack, Sept 21, 2022 and Sept 21, 2023
+Marc Killpack, Sept 21, 2022
 """
 
 from transforms import *
-from utility import skew
 
 eye = np.eye(4)
 pi = np.pi
 
 
-# this is a convenience class that makes it easy to define a function that calculates "A_i(q)", given the
-# DH parameters for link and joint "i" only. 
 class dh2AFunc:
     """
     A = dh2AFunc(dh, joint_type="r")
     Description:
-    Accepts a list of 4 dh parameters corresponding to the transformation for one link 
-    and returns a function "f" that will generate a homogeneous transform "A" given 
-    "q" as an input. A represents the transform from link i-1 to link i. This follows
-    the "standard" DH convention. 
+    Accepts one link of dh parameters and returns a function "f" that will generate a
+    homogeneous transform "A" given "q" as an input. A represents the transform from 
+    link i to link i+1
 
     Parameters:
-    dh - 1 x 4 list from dh parameter table for one transform from link i-1 to link i,
+    dh - 1 x 4 list or iterable of floats, dh parameter table for one transform from link i to link i+1,
     in the order [theta d a alpha] - THIS IS NOT THE CONVENTION IN THE BOOK!!! But it is the order of operations. 
 
     Returns:
-    f(q) - a function that can be used to generate a 4x4 numpy matrix representing the homogeneous transform 
-        from one link to the next
+    f(q) - a function that can be used to generate a 4x4 numpy matrix representing the transform from one link to the next
     """
     def __init__(self, dh, jt):
 
         # if joint is revolute implement correct equations here:
         if jt == 'r':
-            # although A(q) is only a function of "q", the dh parameters are available to these next functions 
-            # because they are passed into the "init" function above. 
-
-            def A(q): 
-                # See eq. (2.52), pg. 64
-                # TODO - complete code that defines the "A" or "T" homogenous matrix for a given set of DH parameters. 
-                # Do this in terms of the variables "dh" and "q" (so that one of the entries in your dh list or array
-                # will need to be added to q).
-
-                # OLD CODE
-                # theta = dh[0]
-                # d = dh[1]
-                # a = dh[2]
-                # alpha = dh[3]
-                #
-                # T = se3(rotz(theta + q), [0, 0, d]) @\
-                #     se3(rotx(alpha), [a, 0, 0])
-                #
-                # return T
-
+            def A(q):
                 theta = dh[0] + q
                 d = dh[1]
                 a = dh[2]
                 alpha = dh[3]
+
+                # See eq. (2.52), pg. 64
+                # TODO - complete code that defines the "A" homogenous matrix for a given set of DH parameters. 
+                # Do this in terms of theta, d, a, and alpha variables as defined above. 
 
                 cth = np.cos(theta)
                 sth = np.sin(theta)
@@ -81,25 +61,14 @@ class dh2AFunc:
         # if joint is prismatic implement correct equations here:
         else:
             def A(q):
-                # See eq. (2.52), pg. 64
-                # TODO - complete code that defines the "A" or "T" homogenous matrix for a given set of DH parameters. 
-                # Do this in terms of the variables "dh" and "q" (so that one of the entries in your dh list or array
-                # will need to be added to q).
-
-                # OLD CODE
-                # theta = dh[0]
-                # d = dh[1]
-                # a = dh[2]
-                # alpha = dh[3]
-                # T = se3(rotz(theta), [0, 0, d + q]) @\
-                #     se3(rotx(alpha), [a, 0, 0])
-                #
-                # return T
-
                 theta = dh[0]
                 d = dh[1] + q
                 a = dh[2]
                 alpha = dh[3]
+
+                # See eq. (2.52), pg. 64
+                # TODO - complete code that defines the "A" homogenous matrix for a given set of DH parameters. 
+                # Do this in terms of theta, d, a, and alpha variables as defined above. 
 
                 cth = np.cos(theta)
                 sth = np.sin(theta)
@@ -126,18 +95,18 @@ class SerialArm:
     """
 
 
-    def __init__(self, dh_params, jt=None, base=eye, tip=eye, joint_limits=None):
+    def __init__(self, dh, jt=None, base=eye, tip=eye, joint_limits=None):
         """
-        arm = SerialArm(dh_params, joint_type, base=I, tip=I, radians=True, joint_limits=None)
-        :param dh: n length list where each entry in list is another list of length 4, representing dh parameters, [theta d a alpha]
-        :param jt: n length list of strings, 'r' for revolute joint and 'p' for prismatic joint
-        :param base: 4x4 numpy array representing SE3 transform from world or inertial frame to frame 0
-        :param tip: 4x4 numpy array representing SE3 transform from frame n to tool frame or tip of robot
+        arm = SerialArm(dh, joint_type, base=I, tip=I, radians=True, joint_limits=None)
+        :param dh: n length list or iterable of length 4 list or iterables representing dh parameters, [theta d a alpha]
+        :param jt: n length list or iterable of strings, 'r' for revolute joint and 'p' for prismatic joint
+        :param base: 4x4 numpy or sympy array representing SE3 transform from world frame to frame 0
+        :param tip: 4x4 numpy or sympy array representing SE3 transform from frame n to tool frame
         :param joint_limits: 2 length list of n length lists, holding first negative joint limit then positive, none for
         not implemented
         """
-        self.dh = dh_params
-        self.n = len(dh_params)
+        self.dh = dh
+        self.n = len(dh)
 
         # we will use this list to store the A matrices for each set/row of DH parameters. 
         self.transforms = []
@@ -151,29 +120,41 @@ class SerialArm:
                 print("WARNING! Joint Type list does not have the same size as dh param list!")
                 return None
 
-        # using the code we wrote above to generate the function A(q) for each set of DH parameters
+        # generating the function A(q) for each set of DH parameters
         for i in range(self.n):
             # TODO use the class definition above (dh2AFunc), and the dh parameters and joint type to
             # make a function and then append that function to the "transforms" list. 
-            
-            # changed to answer key, previously: dh2AFunc(self.dh[i], self.jt[i])
-            f = dh2AFunc(self.dh[i], self.jt[i])
+            f = dh2AFunc(dh[i], self.jt[i])
             self.transforms.append(f.A)
-
 
         # assigning the base, and tip transforms that will be added to the default DH transformations.
         self.base = base
         self.tip = tip
         self.qlim = joint_limits
 
-        # define reach attribute of arm
+        # calculating rough numbers to understand the workspace for drawing the robot
         self.reach = 0
         for i in range(self.n):
-            self.reach += np.sqrt(self.dh[i][0]**2 + self.dh[i][2]**2)
+            self.reach += np.sqrt(self.dh[i][1]**2 + self.dh[i][2]**2)
 
         self.max_reach = 0.0
         for dh in self.dh:
-            self.max_reach += norm(np.array([dh[0], dh[2]]))
+            self.max_reach += norm(np.array([dh[1], dh[2]]))
+
+
+
+    def __str__(self):
+        """
+            This function just provides a nice interface for printing information about the arm. 
+            If we call "print(arm)" on an SerialArm object "arm", then this function gets called.
+            See example in "main" below. 
+        """
+        dh_string = """DH PARAMS\n"""
+        dh_string += """theta\t|\td\t|\ta\t|\talpha\t|\ttype\n"""
+        dh_string += """---------------------------------------\n"""
+        for i in range(self.n):
+            dh_string += f"{self.dh[i][0]}\t|\t{self.dh[i][1]}\t|\t{self.dh[i][2]}\t|\t{self.dh[i][3]}\t|\t{self.jt[i]}\n"
+        return "Serial Arm\n" + dh_string
 
 
     def fk(self, q, index=None, base=False, tip=False):
@@ -196,7 +177,6 @@ class SerialArm:
                 T - the 4 x 4 homogeneous transform from frames determined from "index" variable
         """
 
-        ###############################################################################################
         # the following lines of code are data type and error checking. You don't need to understand
         # all of it, but it is helpful to keep. 
 
@@ -233,17 +213,10 @@ class SerialArm:
             print("WARNING: starting frame must be less than ending frame!")
             print(f"Starting frame: {start_frame}  Ending frame: {end_frame}")
             return None
-        ###############################################################################################        
-        ###############################################################################################
 
-
-        # TODO - Write code to calculate the total homogeneous transform "T" based on variables stored
-        # in "base", "tip", "start_frame", and "end_frame". Look at the function definition if you are 
-        # unsure about the role of each of these variables. This is mostly easily done with some if/else 
-        # statements and a "for" loop to add the effect of each subsequent A_i(q_i). But you can 
-        # organize the code any way you like.  
-        T = np.eye(4)
-        # if there is a base frame, redefine base
+        # TODO complete each of the different cases below. If you don't like the 
+        # current setup (in terms of if/else statements) you can do your own thing.
+        # But the functionality should be the same. 
         if base and start_frame == 0:
             T = self.base
         else:
@@ -262,8 +235,7 @@ class SerialArm:
         """
         J = arm.jacob(q)
         Description: 
-        Returns the geometric jacobian for the frame defined by "index", which corresponds
-        to a frame on the arm, with the arm in a given configuration defined by "q"
+        Returns the geometric jacobian for the end effector frame of the arm in a given configuration
 
         Parameters:
         q - list or numpy array of joint positions
@@ -280,49 +252,30 @@ class SerialArm:
             print("WARNING: Index greater than number of joints!")
             print(f"Index: {index}")
 
-        # TODO - start by declaring a zero matrix that is the correct size for the Jacobian
-        J = np.zeros( (6, index) )
+        J = np.zeros((6, self.n))
+        Te = self.fk(q, index, base=base, tip=tip)
+        pe = Te[0:3, 3]
 
-        # TODO - find the current position of the point of interest (usually origin of frame "n") 
-        # using your fk function this will likely require additional intermediate variables than 
-        # what is shown here. 
-        Tn_in_0 = self.fk(q)
-        pe = Tn_in_0[0:3,3] # define z of the point of interest
-
-
-        # TODO - calculate all the necessary values using your "fk" function, and fill every column
-        # of the jacobian using this "for" loop. Functions like "np.cross" may also be useful. 
         for i in range(index):
             # check if joint is revolute
             if self.jt[i] == 'r':
-                # pull z vector out of transformation matrix
-                T = self.fk(q, index=i)
-                z = T[0:3, 2]
+                T = self.fk(q, i, base=base, tip=tip)
+                z_axis = T[0:3, 2]
                 p = T[0:3, 3]
-                # find the position vector
-                Jv = np.cross(z, pe - p)
-                # find the angular velocity
-                Jw = z
-
-                J[0:3, i] = Jv
-                J[3:6, i] = Jw
-
+                J[0:3, i] = np.cross(z_axis, pe - p, axis=0)
+                J[3:6, i] = z_axis
+                
             # if not assume joint is prismatic
             else:
-                # prismatic joint doesn't have cross product for velocity
-                T = self.fk(q, index=i)
-                Jv = T[0:3, 2]
-                # prismatic joint doesn't have any linear velocity
-                Jw = np.zeros(3)
-
-                J[0:3, i] = Jv
-                J[3:6, i] = Jw
+                T = self.fk(q, i, base=base, tip=tip)
+                z_axis = T[0:3, 2]
+                J[0:3, i] = z_axis
+                J[3:6, i] = np.zeros_like(z_axis)
 
         return J
 
-    # insert this function into your SerialArm class and complete it. 
-    # Please keep the function definition, and what it returns the same. 
-    def ik_position(self, target, q0=None, method='J_T', force=True, tol=1e-4, K=None, kd=0.001, max_iter=100):
+    def ik_position(self, target, q0=None, method='J_T', force=True, tol=1e-4, K=None, kd=0.001, max_iter=100, 
+                    debug=False, debug_step=False):
         """
         (qf, ef, iter, reached_max_iter, status_msg) = arm.ik2(target, q0=None, method='jt', force=False, tol=1e-6, K=None)
         Description:
@@ -350,6 +303,8 @@ class SerialArm:
             kd: is a scalar used in the pinv method to make sure the matrix is invertible. 
 
             max_iter: maximum attempts before giving up.
+
+            "debug" and "debug_step" are used to plot intermediate values of algorithm. 
 
         Returns:
             qf: 6x1 numpy matrix of final joint values. If IK fails to converge the last set
@@ -397,52 +352,63 @@ class SerialArm:
         if not isinstance(K, np.ndarray):
             return q, error, count, False,  "No gain matrix 'K' provided"
 
+        count = 0
 
-
-        # you may want to define some functions here to help with operations that you will 
-        # perform repeatedly in the while loop below. Alternatively, you can also just define 
-        # them as class functions and use them as self.<function_name>.
-
-        # for example:
         def get_error(q):
-            cur_position = self.fk(q)[0:3, 3]
-            e = target - cur_position
+            cur_position = self.fk(q)
+            e = target - cur_position[0:3, 3]
             return e
 
-        # define function based on selected method
-        if method=='J_T':
-            # define function
-            def q_dot(J):
-                J = self.jacob(q)[0:3, :]
-                e = get_error(q)
-                qdot = J.T @ K @ e
-                return qdot
+        def get_jacobian(q):
+            J = self.jacob(q)
+            return J[0:3, :]
 
-        elif method=='pinv': # damped pseudo inverse
-            def q_dot(q):
-                # get top 3 rows of jacobian
-                J = self.jacob(q)[0:3, :]
-                e = get_error(q)
-                J_dag = J.T @ np.linalg.inv(J @ J.T + (kd**2) * np.eye(3))
-                qdot = J_dag @ K @ e
-                return qdot
+        def get_jdag(J):
+            Jdag = J.T @ np.linalg.inv(J @ J.T + np.eye(3) * kd**2)
+            return Jdag
+
+        e = get_error(q)
+
+        if debug == True: 
+            from visualization import VizScene
+            import time
+            arm = SerialArm(self.dh, self.jt, self.base, self.tip)
+            viz = VizScene()
+            viz.add_arm(arm)
+            
+            # this arm with joints that are almost pink is for the intermediate solutions
+            viz.add_arm(arm, joint_colors=[np.array([1.0, 51.0/255.0, 1.0, 1])]*arm.n)
 
 
-        # In this while loop you will update q for each iteration, and update, then
-        # your error to see if the problem has converged. You may want to print the error
-        # or the "count" at each iteration to help you see the progress as you debug. 
-        # You may even want to plot an arm initially for each iteration to make sure 
-        # it's moving in the right direction towards the target. 
-        error = get_error(q)
-        while np.linalg.norm(error) > tol and count < max_iter:
-            q = q + q_dot(q)
-            error = get_error(q)
-            count += 1
-        # print(self.jacob(q)[0:3, :].T)
+        while np.linalg.norm(e) > tol and count < max_iter:
+            count = count + 1
+            J = get_jacobian(q) 
 
-        # when "while" loop is done, return the relevant info. 
+            if method == 'J_T':
+                qdelta = J.T @ K @ e 
+            elif method == 'pinv':
+                Jdag = get_jdag(J)
+                qdelta = Jdag @ K @ e
+            else:
+                return q, False, "that method is not implemented"
+            
+            # here we assume that delta_t has been included in the gain matrix K. 
+            q = q + qdelta
 
-        return (q, error, count, count < max_iter, 'No errors noted')
+            if debug==True: 
+                viz.update(qs=[q0, q])
+                if debug_step == True:
+                    input('press Enter to see next iteration')
+                else: 
+                    time.sleep(1.0/2.0)
+
+            e = get_error(q)
+            print("error is: ", np.linalg.norm(e), "\t count is: ", count)
+
+        if debug==True: 
+            viz.close_viz()
+
+        return (q, e, count, count < max_iter, 'No errors noted, all clear')
 
 
     def Z_shift(self, R=np.eye(3), p=np.zeros(3,), p_frame='i'):
@@ -461,81 +427,26 @@ class SerialArm:
         Returns:
             Z - 6x6 numpy array, can be used to shift a Jacobian, or a twist
         """
+        from scipy.linalg import block_diag
 
+        def skew(p):
+            return np.array([[0, -p[2], p[1]], [p[2], 0, -p[0]], [-p[1], p[0], 0]])
+        
         # generate our skew matrix
         S = skew(p)
-
-        zeros33 = np.zeros(9).reshape(3,3)
-        I = np.eye(3)
+        buf = np.eye(6)
+        buf[0:3,3:] = -S
 
         if p_frame == 'i':
-            # see 09b notes, transforming jacobians and twists
-            A = np.block([[R, zeros33],
-                          [zeros33, R]])
-
-            B = np.block([[I, -S],
-                          [zeros33, I]])
-
-            Z = A @ B
-
+            Z = block_diag(R, R) @ buf
         elif p_frame == 'j':
-
-            A = np.block([[I, -S],
-                          [zeros33, I]])
-
-            B = np.block([[R, zeros33],
-                          [zeros33, R]])
-
-            Z = A @ B
+            Z = buf @ block_diag(R, R)
         else:
             Z = None
 
         return Z
 
 
-
-    # You don't need to touch this function, but it is helpful to be able to "print" a description about
-    # the robot that you make.
-    def __str__(self):
-        """
-            This function just provides a nice interface for printing information about the arm. 
-            If we call "print(arm)" on an SerialArm object "arm", then this function gets called.
-            See example in "main" below. 
-        """
-        dh_string = """DH PARAMS\n"""
-        dh_string += """theta\t|\td\t|\ta\t|\talpha\t|\ttype\n"""
-        dh_string += """------------------------------------------------------------------------\n"""
-        for i in range(self.n):
-            # unrounded version:
-            # dh_string += f"{self.dh[i][0]}\t|\t{self.dh[i][1]}\t|\t{self.dh[i][2]}\t|\t{self.dh[i][3]}\t|\t{self.jt[i]}\n"
-            # dh_string += f"{float(self.dh[i][0]):.4f}\t|\t{float(self.dh[i][1]):.4f}\t|\t{float(self.dh[i][2]):.4f}\t|\t{float(self.dh[i][3]):.4f}\t|\t{self.jt[i]}\n"
-
-            # dh_string += f"{self.dh[i][0] if float(self.dh[i][0]) == 0 else f'{float(self.dh[i][0]):.4f}'}\t|\t"
-            # dh_string += f"{self.dh[i][1] if float(self.dh[i][1]) == 0 else f'{float(self.dh[i][1]):.4f}'}\t|\t"
-            # dh_string += f"{self.dh[i][2] if float(self.dh[i][2]) == 0 else f'{float(self.dh[i][2]):.4f}'}\t|\t"
-            # dh_string += f"{self.dh[i][3] if float(self.dh[i][3]) == 0 else f'{float(self.dh[i][3]):.4f}'}\t|\t{self.jt[i]}\n"
-
-
-            def format_number(value):
-                # Check if the value is numeric and cast it to float
-                try:
-                    num = float(value)
-                    # If it's an integer, return it as an integer without decimals
-                    if num.is_integer():
-                        return f"{int(num)}"
-                    else:
-                        # Return the number formatted to 4 decimal places if it has decimals
-                        return f"{num:.4f}"
-                except ValueError:
-                    # If it's not numeric, return the original string
-                    return value
-
-            # Then use the function in your print statement
-            dh_string += f"{format_number(self.dh[i][0])}\t|\t{format_number(self.dh[i][1])}\t|\t{format_number(self.dh[i][2])}\t|\t{format_number(self.dh[i][3])}\t|\t{self.jt[i]}\n"
-
-        return "Serial Arm\n" + dh_string
-
-    
 
 if __name__ == "__main__":
     from visualization import VizScene
@@ -557,15 +468,15 @@ if __name__ == "__main__":
     # show an example of calculating the entire forward kinematics
     Tn_in_0 = arm.fk(q)
     print("Tn_in_0:\n", Tn_in_0, "\n")
+    #show_frame('0', '2', Tn_to_0) # this will only work if all of values are numeric
 
     # show an example of calculating the kinematics between frames 0 and 1
     T1_in_0 = arm.fk(q, index=[0,1])
     print("T1_in 0:\n", T1_in_0, "\n")
+    #show_frame('0', '1', T1_to_0)
 
-    # showing how to use "print" with the arm object
     print(arm)
 
-    # now visualizing the coordinate frames that we've calculated
     viz = VizScene()
 
     viz.add_frame(arm.base, label='base')

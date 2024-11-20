@@ -8,12 +8,12 @@ John Morrell, Jan 28 2022
 Tarnarmour@gmail.com
 
 modified by: 
-Marc Killpack, Nov. 4, 2022
+Marc Killpack, October 25, 2022
+               Nov. 20, 2023
 """
 
 import numpy as np
-import transforms as tr
-from kinematics import SerialArm
+from kinematics_key_hw07 import SerialArm
 from utility import skew
 
 eye = np.eye(4)
@@ -42,9 +42,6 @@ class SerialArmDyn(SerialArm):
         self.r_com = r_com
         self.link_inertia = link_inertia
         self.motor_inertia = motor_inertia
-        self.g = np.array([[0], 
-                           [-9.81], 
-                           [0]])
         if joint_damping is None:
             self.B = np.zeros((self.n, self.n))
         else:
@@ -52,11 +49,11 @@ class SerialArmDyn(SerialArm):
 
     def rne(self, q, qd, qdd, 
             Wext=np.zeros((6,)),
-            g=np.zeros((3, )),
-            omega_base=np.zeros((3, )),
-            alpha_base=np.zeros((3, )),
-            v_base=np.zeros((3, )),
-            acc_base=np.zeros((3, ))):
+            g=np.zeros((3,)),
+            omega_base=np.zeros((3,)),
+            alpha_base=np.zeros((3,)),
+            v_base=np.zeros((3,)),
+            acc_base=np.zeros((3,))):
 
         """
         tau, W = RNE(q, qd, qdd):
@@ -67,9 +64,6 @@ class SerialArmDyn(SerialArm):
             qdd:
 
         Returns:
-            tau: torques or forces at joints (assuming revolute joints for now though)
-            wrenches: force and torque at each joint, and for joint i, the wrench is in frame i
-
 
         We start with the velocity and acceleration of the base frame, v0 and a0, and the joint positions, joint velocities,
         and joint accelerations (q, qd, qdd).
@@ -78,8 +72,7 @@ class SerialArmDyn(SerialArm):
         v_i = v_(i-1) + w_i x r_(i-1, com_i)
 
 
-        if motor inertia is None, we don't consider it. Solve for now without motor inertia.
-        The solution will provide code for motor inertia as well. 
+        if motor inertia is None, we don't consider it. Solve for now without motor inertia. The solution will provide code for motor inertia as well. 
         """
 
         omegas = []
@@ -165,7 +158,6 @@ class SerialArmDyn(SerialArm):
 
             # Using the sum of moments and d/dt(angular momentum) to find moment at joint
             # Be very careful with the r x f terms here; easy to mess up
-            # self.r_com[i], - (R_ip1_in_frame_i @ f_prev)
             M_cur = self.link_inertia[i] @ alphas[i] \
                 + np.cross(omegas[i], self.link_inertia[i] @ omegas[i]) \
                 + R_ip1_in_frame_i @ M_prev \
@@ -191,7 +183,8 @@ class SerialArmDyn(SerialArm):
                 print("you need to implement generalized force calculation for joint type:\t", self.jt[i])
 
         return tau, Wrenches
-    
+
+
     def get_M(self, q):
         M = np.zeros((self.n, self.n))
 
@@ -216,27 +209,25 @@ class SerialArmDyn(SerialArm):
         return G
 
 
-
 if __name__ == '__main__':
 
     ## this just gives an example of how to define a robot, this is a planar 3R robot.
-    dh = [[0, 0, 1, 0],
-          [0, 0, 1, 0],
-          [0, 0, 1, 0]]
+    dh = [[0, 0, 0.4, 0],
+        [0, 0, 0.4, 0],
+        [0, 0, 0.4, 0]]
 
     joint_type = ['r', 'r', 'r']
 
     link_masses = [1, 1, 1]
 
     # defining three different centers of mass, one for each link
-    r_coms = [np.array([-0.5, 0, 0]), np.array([-0.5, 0, 0]), np.array([-0.5, 0, 0])]
+    r_coms = [np.array([-0.2, 0, 0]), np.array([-0.2, 0, 0]), np.array([-0.2, 0, 0])]
 
     link_inertias = []
     for i in range(len(joint_type)):
-        iner = link_masses[i] / 12 * dh[i][2]**2
-
-        # this inertia tensor is only defined as having Iyy, and Izz non-zero
-        link_inertias.append(np.array([[0, 0, 0], [0, iner, 0], [0, 0, iner]]))
+        iner = 0.01
+        # this inertia tensor is only defined as having Izz non-zero
+        link_inertias.append(np.array([[0, 0, 0], [0, 0, 0], [0, 0, iner]]))
 
 
     arm = SerialArmDyn(dh,
@@ -247,6 +238,6 @@ if __name__ == '__main__':
 
     # once implemented, you can call arm.RNE and it should work. 
     q = [np.pi/4.0]*3
-    qd = [0.2]*3
-    qdd = [0.05]*3
-    arm.rne(q, qd, qdd)
+    qd = [np.pi/6.0, -np.pi/4.0, np.pi/3.0]
+    qdd = [-np.pi/6.0, np.pi/3.0, np.pi/6.0]
+    arm.rne(q, qd, qdd, g=np.array([0, -9.81, 0]))

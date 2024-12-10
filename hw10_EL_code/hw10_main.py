@@ -7,8 +7,8 @@ import numpy as np
 # %%
 # defining kinematic parameters for robot
 dh = [[0, 0, 0.4, 0],
-     [0, 0, 0.4, 0],
-     [0, 0, 0.4, 0]]
+      [0, 0, 0.4, 0],
+      [0, 0, 0.4, 0]]
 
 joint_type = ['r', 'r', 'r']
 
@@ -73,3 +73,5 @@ print("Coriolis vector from E-L is:")
 print(C_EL)
 
 
+
+# %%

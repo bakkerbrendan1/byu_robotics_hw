@@ -200,6 +200,11 @@ class SerialArm:
                 P = T[0:3, 3]
                 J[0:3, i] = z_axis
                 J[3:6, i] = sp.Matrix([[0.0], [0.0], [0.0]])
+
+        # Post-process: round small values to zero
+        # threshold = 1e-9
+        # J = J.applyfunc(lambda x: 0 if abs(x) < threshold else x)
+        # J = J.n(n=3)
         return J
 
     def jacob_shift(self, q, R, p, index=None):
@@ -239,7 +244,35 @@ class SerialArm:
 
         J_shifted = Z @ J
 
+        # remove values below threshold
+        # threshold = 1e-9
+        # J_shifted = J_shifted.applyfunc(lambda x: 0 if abs(x) < threshold else x)
+        # J_shifted = J_shifted.n(n=3)
+
         return J_shifted
+    
+    def jacob_com(self):
+        #define helper variables
+        J_com = []
+        T_jts = []
+
+        # these are symbolic versions of all joint angles, and their time derivatives
+        q = self.q_sym
+        qd = self.qd_sym
+
+        # now get the Jacobians at the COM of each link
+        for i in range(self.n):
+            T_jts.append(self.fk(q, i+1))
+            T_i_in_base = T_jts[i]
+            r_com_in_base_frame = T_i_in_base[0:3,0:3] @ self.coms[i] 
+            jacob_com_i = self.jacob_shift(q, sp.eye(3), r_com_in_base_frame, index=i+1)
+            
+            # using "sp.simplify" in any of the code below makes for slower code generation, 
+            # but about 20 times faster execution of the function after using "lambdify"
+            # J_com.append(sp.simplify(jacob_com_i.evalf()))
+            J_com.append(sp.simplify(jacob_com_i))
+
+        return J_com
 
    
 if __name__ == "__main__":

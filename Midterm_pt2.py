@@ -174,7 +174,7 @@ if __name__ == "__main__":
             viz.update(qs=[q])
 
             # if your step in q is very small, you can shrink this time, or remove it completely to speed up your animation
-            time.sleep(0.5)
+            time.sleep(0.05)
       # print(q_ik_slns[-1])
       viz.hold()
 

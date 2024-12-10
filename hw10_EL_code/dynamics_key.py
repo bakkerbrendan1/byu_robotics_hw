@@ -60,21 +60,19 @@ class SerialArmDyn(kin.SerialArm):
             r_com_in_base_frame = T_i_in_base[0:3,0:3] @ self.coms[i] 
             jacob_com_i = self.jacob_shift(q, sp.eye(3), r_com_in_base_frame, index=i+1)
             
-            # using "sp.simplify" in any of the code below makes for slower code generation, 
+            # using "simplify" in any of the code below makes for slower code generation, 
             # but about 20 times faster execution of the function after using "lambdify"
             jacob_com.append(sp.simplify(jacob_com_i.evalf()))
 
-
         M_EL = sp.zeros(self.n, self.n)
-        # TODO - use one for loop to implement symbolic code for M(q)
         for i in range(self.n):
+
             R_link_in_base = T_jts[i][0:3,0:3]
             M_transl = self.masses[i]* jacob_com[i][0:3,:].T @ jacob_com[i][0:3,:]
             M_rot = jacob_com[i][3:,:].T @ R_link_in_base @ self.Is[i] @ R_link_in_base.T @ jacob_com[i][3:,:]
             M_EL = M_EL + sp.simplify(M_transl.evalf()) + sp.simplify(M_rot.evalf())
-
+        
         C_EL = sp.zeros(self.n, self.n)
-        # TODO - use three nested for loops to implement symbolic code for C(q, qd)
         for k in range(self.n):
             for j in range(self.n):
                     c_buf = 0
@@ -84,16 +82,14 @@ class SerialArmDyn(kin.SerialArm):
                                                 M_EL[i,j].diff(q[k]))*qd[i]
                     C_EL[k,j] = sp.simplify(c_buf.evalf())
 
-
         P = sp.Matrix([0])
-        # TODO - use one for loop to calculate P 
         for i in range(self.n):
             T_i_in_base = T_jts[i]
             r_com_rel_base = T_i_in_base[0:3,0:3] @ self.coms[i] + T_i_in_base[0:3,3]
             P = P + sp.simplify(self.masses[i]* self.grav.T @ r_com_rel_base).evalf()
 
-        G_EL = sp.zeros(self.n,1)
-        # TODO - use one for loop to calculate symbolic code for G(q)
+
+        G_EL = sp.zeros(3,1)
         for i in range(self.n):
             G_EL[i,0] = sp.simplify(P.diff(q[i])).evalf()
 
@@ -124,7 +120,7 @@ if __name__ == '__main__':
                        r_com=r_coms,
                        link_inertia=link_inertias)
 
-    print(arm.M([0, 0]))
+    print(arm.M([0]*2))
 
 
 
